@@ -16,6 +16,8 @@ class Engine {
     private var entityList:EntityList;
     private var systemList:SystemList;
     private var systemInstances:Array<System>;
+    private var stateSystems:Map<String, Array<System>>;
+    private var globalSystems:Array<System>;
     private var families:ClassMap<Class<Dynamic>, IFamily<Dynamic>>;
 
     /**
@@ -47,6 +49,8 @@ class Engine {
         entityNames = new Map<String, Entity>();
         systemList = new SystemList();
         systemInstances = new Array<System>();
+        stateSystems = new Map();
+        globalSystems = [];
         families = new ClassMap();
         entityAdded = new Signal1<Entity>();
         entityRemoved = new Signal1<Entity>();
@@ -336,5 +340,44 @@ class Engine {
         }
 
         return target_system;
+    }
+
+    public function addGlobalSystem<T:ecs.System>(systemClass:Class<T>) {
+        var target_system:System = getOrCreateSystem(systemClass);
+        globalSystems.push(target_system);
+        enable(systemClass);
+    }
+
+    public function setStateSystem<T:ecs.System>(state:String, systemClass:Class<T>) {
+        var target_system:System = getOrCreateSystem(systemClass);
+
+        if(!stateSystems.exists(state)) {
+            stateSystems[state] = [];
+        }
+
+        stateSystems[state].push(target_system);
+    }
+
+    public function changeState(state:String) {
+        var system:System = systemList.head;
+        var nextSystems = stateSystems[state];
+
+        if(nextSystems == null) {
+            throw "Unknown state " + state;
+        }
+
+        while(system != null) {
+            if(!globalSystems.contains(system) && !nextSystems.contains(system)) {
+                removeSystem(system);
+            }
+
+            system = system.next;
+        }
+
+        for(system in nextSystems) {
+            if(!systemList.contains(Type.getClass(system))) {
+                addSystem(system, system.priority);
+            }
+        }
     }
 }
