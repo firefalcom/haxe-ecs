@@ -8,14 +8,14 @@ import ecs.signals.Signal1;
  * The Engine class is the central point for creating and managing your game state. Add
  * entities and systems to the engine, and fetch families of nodes from the engine.
  */
-class Engine
-{
+class Engine {
     public var entities(get, never):Iterable<Entity>;
     public var systems(get, never):Iterable<System>;
 
     private var entityNames:Map<String, Entity>;
     private var entityList:EntityList;
     private var systemList:SystemList;
+    private var systemInstances:Array<System>;
     private var families:ClassMap<Class<Dynamic>, IFamily<Dynamic>>;
 
     /**
@@ -42,11 +42,11 @@ class Engine
      */
     public var familyClass:Class<IFamily<Dynamic>> = ComponentMatchingFamily;
 
-    public function new()
-    {
+    public function new() {
         entityList = new EntityList();
         entityNames = new Map<String, Entity>();
         systemList = new SystemList();
+        systemInstances = new Array<System>();
         families = new ClassMap();
         entityAdded = new Signal1<Entity>();
         entityRemoved = new Signal1<Entity>();
@@ -60,10 +60,11 @@ class Engine
      * @param entity The entity to add.
      */
 
-    public function addEntity(entity:Entity):Void
-    {
-        if (entityNames.exists(entity.name))
+    public function addEntity(entity:Entity):Void {
+        if(entityNames.exists(entity.name)) {
             throw "The entity name " + entity.name + " is already in use by another entity.";
+        }
+
         entityAdded.dispatch(entity);
         entityList.add(entity);
         entityNames.set(entity.name, entity);
@@ -71,8 +72,8 @@ class Engine
         entity.componentRemoved.add(componentRemoved);
         entity.nameChanged.add(entityNameChanged);
         entity.engine = this;
-        for (family in families)
-        {
+
+        for(family in families) {
             family.newEntity(entity);
         }
 
@@ -87,8 +88,7 @@ class Engine
      * @param entity The entity to remove.
      */
 
-    public function removeEntity(entity:Entity):Void
-    {
+    public function removeEntity(entity:Entity):Void {
         for(child in entity.children) {
             removeEntity(child);
         }
@@ -97,19 +97,18 @@ class Engine
         entity.componentRemoved.remove(componentRemoved);
         entity.nameChanged.remove(entityNameChanged);
         entity.engine = null;
-        for (family in families)
-        {
+
+        for(family in families) {
             family.removeEntity(entity);
         }
+
         entityNames.remove(entity.name);
         entityList.remove(entity);
         entityRemoved.dispatch(entity);
     }
 
-    private function entityNameChanged(entity:Entity, oldName:String):Void
-    {
-        if (entityNames.get(oldName) == entity)
-        {
+    private function entityNameChanged(entity:Entity, oldName:String):Void {
+        if(entityNames.get(oldName) == entity) {
             entityNames.remove(oldName);
             entityNames.set(entity.name, entity);
         }
@@ -121,18 +120,15 @@ class Engine
      * @param name The name of the entity
      * @return The entity, or null if no entity with that name exists on the engine
      */
-    public inline function getEntityByName(name:String):Entity
-    {
+    public inline function getEntityByName(name:String):Entity {
         return entityNames.get(name);
     }
 
     /**
      * Remove all entities from the engine.
      */
-    public function removeAllEntities():Void
-    {
-        while (entityList.head != null)
-        {
+    public function removeAllEntities():Void {
+        while(entityList.head != null) {
             removeEntity(entityList.head);
         }
     }
@@ -140,8 +136,7 @@ class Engine
     /**
      * Returns an iterator of all entities in the engine.
      */
-    private inline function get_entities():Iterable<Entity>
-    {
+    private inline function get_entities():Iterable<Entity> {
         return entityList;
     }
 
@@ -149,10 +144,8 @@ class Engine
      * @private
      */
 
-    private function componentAdded(entity:Entity, componentClass:Class<Dynamic>):Void
-    {
-        for (family in families)
-        {
+    private function componentAdded(entity:Entity, componentClass:Class<Dynamic>):Void {
+        for(family in families) {
             family.componentAddedToEntity(entity, componentClass);
         }
     }
@@ -161,10 +154,8 @@ class Engine
      * @private
      */
 
-    private function componentRemoved(entity:Entity, componentClass:Class<Dynamic>):Void
-    {
-        for (family in families)
-        {
+    private function componentRemoved(entity:Entity, componentClass:Class<Dynamic>):Void {
+        for(family in families) {
             family.componentRemovedFromEntity(entity, componentClass);
         }
     }
@@ -182,16 +173,17 @@ class Engine
      * @return A linked list of all nodes of this type from all entities in the engine.
      */
 
-    public function getNodeList<TNode:Node<TNode>>(nodeClass:Class<TNode>):NodeList<TNode>
-    {
-        if (families.exists(nodeClass))
+    public function getNodeList<TNode:Node<TNode>>(nodeClass:Class<TNode>):NodeList<TNode> {
+        if(families.exists(nodeClass)) {
             return cast(families.get(nodeClass)).nodeList;
+        }
 
         var family:IFamily<TNode> = cast(Type.createInstance(familyClass, [nodeClass, this ]));
         families.set(nodeClass, family);
 
-        for (entity in entityList)
+        for(entity in entityList) {
             family.newEntity(entity);
+        }
 
         return family.nodeList;
     }
@@ -207,10 +199,8 @@ class Engine
      * @param nodeClass The type of the node class if the list to be released.
      */
 
-    public function releaseNodeList<TNode:Node<TNode>>(nodeClass:Class<TNode>):Void
-    {
-        if (families.exists(nodeClass))
-        {
+    public function releaseNodeList<TNode:Node<TNode>>(nodeClass:Class<TNode>):Void {
+        if(families.exists(nodeClass)) {
             families.get(nodeClass).cleanUp();
             families.remove(nodeClass);
         }
@@ -229,8 +219,7 @@ class Engine
      * lower number means the system is updated sooner.
      */
 
-    public function addSystem(system:System, priority:Int):Void
-    {
+    public function addSystem(system:System, priority:Int):Void {
         system.priority = priority;
         system.addToEngine(this);
         systemList.add(system);
@@ -244,16 +233,14 @@ class Engine
      * null if no systems of this type are in the engine.
      */
 
-    public function getSystem<TSystem:System>(type:Class<TSystem>):TSystem
-    {
+    public function getSystem<TSystem:System>(type:Class<TSystem>):TSystem {
         return systemList.get(type);
     }
 
     /**
      * Returns an iterator of all systems in the engine.
      */
-    private inline function get_systems():Iterable<System>
-    {
+    private inline function get_systems():Iterable<System> {
         return systemList;
     }
 
@@ -263,8 +250,7 @@ class Engine
      * @param system The system to remove from the engine.
      */
 
-    public function removeSystem(system:System):Void
-    {
+    public function removeSystem(system:System):Void {
         systemList.remove(system);
         system.removeFromEngine(this);
     }
@@ -273,17 +259,16 @@ class Engine
      * Remove all systems from the engine.
      */
 
-    public function removeAllSystems():Void
-    {
-        while (systemList.head != null)
-        {
-          var system : System = systemList.head;
+    public function removeAllSystems():Void {
+        while(systemList.head != null) {
+            var system : System = systemList.head;
             systemList.head = systemList.head.next;
             system.previous = null;
             system.next = null;
-            system.removeFromEngine( this );
+            system.removeFromEngine(this);
             removeSystem(systemList.head);
         }
+
         systemList.tail = null;
     }
 
@@ -297,27 +282,59 @@ class Engine
      * @time The duration, in seconds, of this update step.
      */
 
-    public function update(time:Float):Void
-    {
+    public function update(time:Float):Void {
         updating = true;
-        for (system in systemList)
-        {
-            try
-            {
+
+        for(system in systemList) {
+            try {
                 system.update(time);
-            }
-            catch(e:Dynamic)
-            {
-                #if js
-                    js.html.Console.log("Error while updating system " + Type.getClassName(Type.getClass(system)));
-                    js.html.Console.log(e);
-                #else
-                    trace("Error while updating system " + Type.getClassName(Type.getClass(system)));
-                    trace(e);
-                #end
+            } catch(e:Dynamic) {
+#if js
+                js.html.Console.log("Error while updating system " + Type.getClassName(Type.getClass(system)));
+                js.html.Console.log(e);
+#else
+                trace("Error while updating system " + Type.getClassName(Type.getClass(system)));
+                trace(e);
+#end
             }
         }
+
         updating = false;
         updateComplete.dispatch();
+    }
+
+
+    public function enable<T:ecs.System>(systemClass:Class<T>) {
+        var target_system:System = getOrCreateSystem(systemClass);
+
+        if(!systemList.contains(systemClass)) {
+            addSystem(target_system, target_system.priority);
+        }
+    }
+
+    public function disable<T:ecs.System>(systemClass:Class<T>) {
+        var target_system:System = getOrCreateSystem(systemClass);
+
+        if(systemList.contains(systemClass)) {
+            removeSystem(target_system);
+        }
+    }
+
+    public function getOrCreateSystem<T:ecs.System>(systemClass:Class<T>) {
+        var target_system:System = null;
+
+        for(instance in systemInstances) {
+            if(Std.isOfType(instance, systemClass)) {
+                target_system = instance;
+                break;
+            }
+        }
+
+        if(target_system == null) {
+            target_system = Type.createInstance(systemClass, []);
+            systemInstances.push(target_system);
+        }
+
+        return target_system;
     }
 }
