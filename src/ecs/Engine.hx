@@ -19,6 +19,7 @@ class Engine {
     private var stateSystems:Map<String, Array<System>>;
     private var globalSystems:Array<System>;
     private var families:ClassMap<Class<Dynamic>, IFamily<Dynamic>>;
+    private var stateInheritance:Map<String, String>;
 
     /**
      * Indicates if the engine is currently in its update loop.
@@ -56,6 +57,7 @@ class Engine {
         entityRemoved = new Signal1<Entity>();
         updateComplete = new Signal0();
         updating = false;
+        stateInheritance = new Map();
     }
 
     /**
@@ -358,19 +360,40 @@ class Engine {
         stateSystems[state].push(target_system);
     }
 
+    public function setStateInheritance(state:String, parent:String) {
+        stateInheritance.set(state, parent);
+    }
+
+    private function getInheritedSystems(state:String):Array<System> {
+        var systems:Array<System> = [];
+        var currentState = state;
+
+        while (currentState != null) {
+            if (stateSystems.exists(currentState)) {
+                for (system in stateSystems[currentState]) {
+                    if (!systems.contains(system)) {
+                        systems.push(system);
+                    }
+                }
+            }
+            currentState = stateInheritance.get(currentState);
+        }
+
+        return systems;
+    }
+
     public function changeState(state:String) {
         var system:System = systemList.head;
-        var nextSystems = stateSystems[state];
+        var nextSystems = getInheritedSystems(state);
 
-        if(nextSystems == null) {
-            throw "Unknown state " + state;
+        if(nextSystems.length == 0) {
+            trace('Empty state ${state} ?');
         }
 
         while(system != null) {
             if(!globalSystems.contains(system) && !nextSystems.contains(system)) {
                 removeSystem(system);
             }
-
             system = system.next;
         }
 
@@ -378,6 +401,12 @@ class Engine {
             if(!systemList.contains(Type.getClass(system))) {
                 addSystem(system, system.priority);
             }
+        }
+
+        trace('Changed state to "${state}", active systems:');
+
+        for(system in systemList) {
+            trace("    " + Type.getClassName(Type.getClass(system)));
         }
     }
 }
