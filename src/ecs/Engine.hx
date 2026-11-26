@@ -67,6 +67,11 @@ class Engine {
      */
 
     public function addEntity(entity:Entity):Void {
+        if(entity.engine != null) {
+            trace("Entity already added, skipping.");
+            return;
+        }
+
         if(entityNames.exists(entity.name)) {
             throw "The entity name " + entity.name + " is already in use by another entity.";
         }
@@ -368,14 +373,15 @@ class Engine {
         var systems:Array<System> = [];
         var currentState = state;
 
-        while (currentState != null) {
-            if (stateSystems.exists(currentState)) {
-                for (system in stateSystems[currentState]) {
-                    if (!systems.contains(system)) {
+        while(currentState != null) {
+            if(stateSystems.exists(currentState)) {
+                for(system in stateSystems[currentState]) {
+                    if(!systems.contains(system)) {
                         systems.push(system);
                     }
                 }
             }
+
             currentState = stateInheritance.get(currentState);
         }
 
@@ -394,6 +400,7 @@ class Engine {
             if(!globalSystems.contains(system) && !nextSystems.contains(system)) {
                 removeSystem(system);
             }
+
             system = system.next;
         }
 
